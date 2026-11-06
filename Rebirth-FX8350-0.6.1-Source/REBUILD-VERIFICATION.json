@@ -1,0 +1,23 @@
+{
+  "original_sha256": "752807180c4ed919667ff0ec163046410187e873888dd75248e78aaa72e363dc",
+  "rebuilt_game_sha256": "65469807e5cf6d2a0b63e8fa92439fcb633fd30490798f38edfbc8f72c9800dc",
+  "payload_sha256": "60322bd23e7cce896ed5119b35bfa59b38838fa731a6d6b220edd37825db1e8a",
+  "runtime_sha256": "efb50e958849c35631c0ba4d85fbc5e377443bf0d2989189698b8010516bc8f7",
+  "translated": 23171,
+  "skips": 0,
+  "unwind_refusals": 0,
+  "full_native_build": true,
+  "installed_or_launched_game": false,
+  "binaries": {
+    "Check compatibility.cmd": "6345d2a974e88e10a6f8cfcc4b38a72ddc025aa0842011604816624181f0a96a",
+    "ff7rebirth.fxpatch": "60322bd23e7cce896ed5119b35bfa59b38838fa731a6d6b220edd37825db1e8a",
+    "fxcompat.dll": "efb50e958849c35631c0ba4d85fbc5e377443bf0d2989189698b8010516bc8f7",
+    "FxCompatInstaller.exe": "ce570ceec03ec464539fc3017e36fc022f72c40dab4fbf91fb87c25918b4ef7d",
+    "Install mod.cmd": "10e60f215cdb759f8de8c09a565d39a56bd1482555c62bbec6b5422a17cdc8da",
+    "Restore original.cmd": "3e759545a75a4dae3df8eb982c776aa0844c1241a748299fae0a05b7394d86fa",
+    "Verify installation.cmd": "a792e85f20d9856ef15fda2831d98f1f8e703f5634be5c39b239b00df2c4a430"
+  },
+  "runtime_text_section_matches_release": true,
+  "verification_date": "2026-11-06",
+  "verification_scope": "Full review driver run; exact game/delta reproduced; native code compiled; installer help ran. No game launch or installation."
+}
