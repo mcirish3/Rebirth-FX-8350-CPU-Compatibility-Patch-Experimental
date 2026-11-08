@@ -1,0 +1,15 @@
+# Build output: contains full original and modified game executables. Never commit.
+build/
+
+# Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Game files and generated binaries
+*.exe
+*.dll
+*.fxpatch
+*.fxcompat-original
+*.zip
+*.7z
