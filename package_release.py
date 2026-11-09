@@ -28,8 +28,12 @@ SRC_FILES = ["avx2_lower.py", "bmi2_lower.py", "build_static_mod.py", "unwind_bu
 TOP_FILES = ["fxreborn.py", "LICENSE", "FX Reborn - Install or Update.cmd",
              "FX Reborn - Restore original.cmd", "FX Reborn - Status.cmd"]
 STDLIB_SKIP = {"test", "idlelib", "tkinter", "turtledemo", "ensurepip", "venv", "lib2to3",
-               "pydoc_data", "site-packages", "__pycache__", "unittest", "sqlite3", "curses", "dbm"}
-DLL_SKIP = ("_tkinter", "tcl", "tk", "sqlite", "_sqlite3", "_test", "_ctypes_test", "xxlimited")
+               "pydoc_data", "site-packages", "__pycache__", "unittest", "sqlite3", "curses", "dbm",
+               "asyncio", "email", "http", "xml", "xmlrpc", "wsgiref", "multiprocessing",
+               "concurrent", "html", "urllib", "zoneinfo", "tomllib", "_pyrepl"}
+# Only the compiled modules the patcher uses (everything else it needs is built
+# into python313.dll); keeps the download small and avoids shipping OpenSSL.
+DLL_KEEP = {"_ctypes.pyd", "libffi-8.dll"}
 
 
 def sha256(p: Path) -> str:
@@ -67,7 +71,7 @@ def build_python(out: Path):
                  "vcruntime140_1.dll", "LICENSE.txt"):
         shutil.copy2(base / name, py / name)
     for f in (base / "DLLs").iterdir():
-        if f.suffix.lower() in (".pyd", ".dll") and not f.name.lower().startswith(DLL_SKIP):
+        if f.name.lower() in DLL_KEEP:
             shutil.copy2(f, py / f.name)
     # Standard library as compiled bytecode in a zip, like the embeddable distribution.
     stage = ROOT / "dist" / "stdlib"
@@ -111,7 +115,7 @@ def main():
     sums = [f"{sha256(f)}  {f.relative_to(out).as_posix()}" for f in sorted(out.rglob("*")) if f.is_file()]
     (out / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n")
     archive = dist / f"{NAME}.zip"
-    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for f in sorted(out.rglob("*")):
             if f.is_file():
                 z.write(f, (Path(NAME) / f.relative_to(out)).as_posix())
