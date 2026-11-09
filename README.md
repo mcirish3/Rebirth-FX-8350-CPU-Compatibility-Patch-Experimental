@@ -3,9 +3,29 @@
 An experimental native CPU compatibility patch for **FINAL FANTASY VII REBIRTH, Steam build 23447986**. It replaces selected AVX2/BMI2 instructions with sequences that run on CPUs without AVX2, such as the AMD FX-8350, and adds a small local runtime for short instruction sites.
 
 - **Download:** [Nexus Mods](https://www.nexusmods.com/finalfantasy7rebirth/mods/2477)
-- **Works only on Steam build 23447986.** The installer checks the game executable's hash and refuses any other build, so a game update stops it from installing until the patch is regenerated.
+- **The v6 release package works only on Steam build 23447986.** Its installer checks the game executable's hash. The new `fxreborn.py` patcher (below) builds the patch for whatever build is installed, so game updates are handled by running it again.
 - **Status:** experimental, gameplay-tested on one FX-8350 + RX 6600 PC. See *Testing and limitations* below.
 - **License:** MIT (see [LICENSE](LICENSE)). No rights to the game itself are granted.
+
+---
+
+## Game updates: build the patch on your own PC (`fxreborn.py`)
+
+The v6 release ships a binary diff that fits only Steam build 23447986. `fxreborn.py` instead builds the patch from whatever `ff7rebirth_.exe` is installed, so a Steam update no longer breaks the mod. After an update, run it again.
+
+- **Install or update:** `FX Reborn - Install or Update.cmd` (or `py -3.13 fxreborn.py install [path]`).
+- **Restore the original:** `FX Reborn - Restore original.cmd` (or `py -3.13 fxreborn.py restore`).
+- **Status:** `py -3.13 fxreborn.py status`.
+
+How it works:
+
+1. **Known build (23447986):** uses the frozen, play-tested v6 list. The result is byte-identical to the v6 release (SHA-256 `65469807…00dc`).
+2. **Any other build:** scans the executable (`src/discover_code_sites.py` + `src/find_sites.py`). Instructions reached through direct control flow from the entry point, exports or unwind-table functions are always included. Pointer-reached code is included after an automatic version of the v6 manual review. Instructions found only by a byte sweep are never patched, because they may be data. On build 23447986 this scan selects exactly the 23,171 v6 sites and reproduces the v6 hash, without the saved list. Builds other than 23447986 are marked **unverified**, because nobody has play-tested them.
+3. **CPU check:** found by its pattern (`src/cpu_gate.py`) rather than a fixed address.
+4. **Safety net:** if the game reaches an AVX2/BMI2 instruction the scan missed, `fxcompat.dll` writes its address to `fxreborn-missed.log` next to the game before the game closes. The next `install` adds it ("learned sites").
+5. The original is kept as `ff7rebirth_.exe.fxcompat-original`. When the exe changes underneath it (a Steam update), the new original is saved instead. State is kept in `fxreborn-state.json`.
+
+The patcher currently needs Python 3.13 with `src/pylibs` (iced-x86 1.22.0, pefile 2024.8.26), plus a compiled `fxcompat.dll` next to `fxreborn.py`. A player release should bundle these. Building takes about 1.5 minutes for a known build, plus about 3 minutes of scanning for a new one.
 
 ---
 
@@ -33,7 +53,7 @@ The copied PE builder has a portable input entry point: the development-only har
 
 The installer reads Steam locations and modifies only the explicitly selected main executable and its compatibility DLL, retaining a hash-verified original backup. Unfamiliar executables, backups and component hashes are rejected. It does not modify saves/settings, alter permissions, request elevation, or make network requests.
 
-The runtime is loaded through the added PE import. Its exception handler redirects only registered illegal-instruction addresses in the same process to generated replacement stubs. It does not inject into unrelated processes. Optional developer diagnostics can write one unmatched-fault record to an explicitly inherited `FXCOMPAT_LOG_HANDLE`; normal use does not set this variable. No diagnostic upload is performed.
+The runtime is loaded through the added PE import. Its exception handler redirects only registered illegal-instruction addresses in the same process to generated replacement stubs. It does not inject into unrelated processes. When an illegal instruction is not in the table, it writes one record (address, instruction bytes, registers) to an explicitly inherited `FXCOMPAT_LOG_HANDLE` if one is set. Otherwise it appends the record to `fxreborn-missed.log` next to the game, and the game then closes as it would without the handler. The patcher reads that file to add missed sites. No diagnostic upload is performed.
 
 The patch changes a CPU-requirement branch for this exact build. It does not globally spoof CPUID or remove Steam ownership requirements. The original game hash is checked before any generation or installation.
 

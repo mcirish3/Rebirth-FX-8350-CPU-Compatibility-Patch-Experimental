@@ -67,9 +67,26 @@ struct JsonLine {
     }
 };
 
+// Without an inherited log handle, unmatched instructions go to
+// "fxreborn-missed.log" next to the game. The patcher reads this file and adds
+// the addresses on its next run, so a site the static scan missed after a game
+// update only has to be found once.
+static HANDLE OpenMissedLog() {
+    wchar_t path[MAX_PATH + 32] = {};
+    DWORD n = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    if (!n || n >= MAX_PATH) return INVALID_HANDLE_VALUE;
+    while (n && path[n - 1] != L'\\') --n;
+    const wchar_t name[] = L"fxreborn-missed.log";
+    for (unsigned i = 0; i != sizeof(name) / sizeof(name[0]); ++i) path[n + i] = name[i];
+    return CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                       OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+}
+
 static void LogUnmatched(EXCEPTION_POINTERS* ep) {
-    if (g_log == INVALID_HANDLE_VALUE || InterlockedCompareExchange(&g_unmatched_logged, 1, 0)) return;
+    if (InterlockedCompareExchange(&g_unmatched_logged, 1, 0)) return;
     DWORD saved_error = GetLastError();
+    if (g_log == INVALID_HANDLE_VALUE) g_log = OpenMissedLog();
+    if (g_log == INVALID_HANDLE_VALUE) { SetLastError(saved_error); return; }
     const CONTEXT* context = ep->ContextRecord;
     JsonLine line = {};
     line.add("{\"event\":\"unmatched_illegal_instruction\"");
@@ -82,6 +99,7 @@ static void LogUnmatched(EXCEPTION_POINTERS* ep) {
         line.field("allocation_base", reinterpret_cast<uintptr_t>(region.AllocationBase));
         line.field("rva", context->Rip - reinterpret_cast<uintptr_t>(region.AllocationBase));
         line.field("memory_type", region.Type);
+        line.field("main_module", region.AllocationBase == GetModuleHandleW(nullptr));
     }
     line.add(",\"bytes\":\"");
     __try {
@@ -205,7 +223,8 @@ static bool InitializeImage(HMODULE main_module) {
                                            reinterpret_cast<uintptr_t>(base)+entry.stub_rva))
                 return false;
         }
-        if ((header->count || g_log != INVALID_HANDLE_VALUE) && !g_handler) {
+        // Always installed for a patched image, so missed sites are logged.
+        if (!g_handler) {
             g_handler = AddVectoredExceptionHandler(1, Redirect);
             if (!g_handler) return false;
         }

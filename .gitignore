@@ -13,3 +13,10 @@ __pycache__/
 *.fxcompat-original
 *.zip
 *.7z
+
+# Local copy of pinned Python dependencies (iced-x86, pefile)
+src/pylibs/
+# Patcher cache and state
+src/code_cache/
+# Player package output
+dist/

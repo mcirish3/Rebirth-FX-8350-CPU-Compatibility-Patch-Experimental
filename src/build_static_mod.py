@@ -182,9 +182,11 @@ class Builder:
     def finish(self):
         iat=self.imports(); self.instructions()
         if self.path.name.lower()=='ff7rebirth_.exe':
-            rva=0x44913dc
-            if self.pe.get_data(rva,2)!=b'\x72\x3b':raise RuntimeError('CPU check version mismatch')
-            self.store(rva,b'\xeb\x3b')
+            # Located by pattern (see cpu_gate.py) so game updates that move it still work.
+            import cpu_gate
+            rva=cpu_gate.find(self.pe,self.original)
+            self.cpu_gate_rva=rva
+            self.store(rva,b'\xeb'+self.pe.get_data(rva+1,1))
         elif self.pe.FILE_HEADER.Characteristics&0x2000:self.aux_entry(iat)
         entries=self.append(b''.join(struct.pack('<II',*x) for x in self.redirects),8)
         self.payload[:32]=struct.pack('<8sIIIIII',b'FXCPT001',1,len(self.redirects),entries,0,self.old_image,0)
