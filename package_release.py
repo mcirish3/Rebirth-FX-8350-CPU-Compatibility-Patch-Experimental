@@ -21,7 +21,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 NAME = f"FX-Reborn-{VERSION}"
 SRC_FILES = ["avx2_lower.py", "bmi2_lower.py", "build_static_mod.py", "unwind_builder.py",
              "cpu_gate.py", "find_sites.py", "discover_code_sites.py", "v6_sites.json"]
@@ -85,7 +85,8 @@ def build_python(out: Path):
         dest = stage / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, dest)
-    compileall.compile_dir(str(stage), quiet=1, legacy=True, optimize=0)
+    # ddir: tracebacks show "python313.zip\threading.py", not the build PC's folder.
+    compileall.compile_dir(str(stage), quiet=1, legacy=True, optimize=0, ddir="python313.zip")
     with zipfile.ZipFile(py / "python313.zip", "w", zipfile.ZIP_DEFLATED) as z:
         for f in stage.rglob("*.pyc"):
             z.write(f, f.relative_to(stage).as_posix())

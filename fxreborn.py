@@ -32,7 +32,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -46,7 +45,7 @@ BACKUP_SUFFIX = ".fxcompat-original"
 STATE_NAME = "fxreborn-state.json"
 MISSED_LOG = "fxreborn-missed.log"
 RUNTIME = "fxcompat.dll"
-VERSION = "FX Reborn 0.7 (build-on-PC)"
+VERSION = "FX Reborn 0.7.1 (build-on-PC)"
 
 
 class Stop(Exception):
@@ -137,7 +136,7 @@ def steam_libraries() -> list[Path]:
     for root in roots:
         vdf = root / "steamapps" / "libraryfolders.vdf"
         if vdf.exists():
-            libs += [Path(p.replace("\\\\", "\\")) for p in re.findall(r'"path"\s+"([^"]+)"', vdf.read_text(errors="ignore"))]
+            libs += [Path(p.replace("\\\\", "\\")) for p in re.findall(r'"path"\s+"([^"]+)"', vdf.read_text(encoding="utf-8", errors="replace"))]
         libs.append(root)
     seen, out = set(), []
     for lib in libs:
@@ -167,9 +166,48 @@ def find_game(explicit: str | None) -> Path:
 
 
 def game_running() -> bool:
+    # tasklist prints in the console's language and code page (e.g. German
+    # "Es laufen keine Tasks ..."), so compare raw bytes: the exe name is ASCII.
     out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {EXE_NAME}", "/NH"],
-                         capture_output=True, text=True).stdout
-    return EXE_NAME.lower() in out.lower()
+                         capture_output=True).stdout or b""
+    return EXE_NAME.lower().encode("ascii") in out.lower()
+
+
+def reset_permissions(path: Path):
+    """Give the file the normal permissions inherited from the game folder.
+
+    0.7.0 built the exe in a Python 3.13 temp folder, whose files only allow
+    SYSTEM, Administrators and the owner. After an elevated install, a
+    non-elevated Steam then failed to start the game (CreateProcess error 5).
+    """
+    r = subprocess.run(["icacls", str(path), "/reset", "/Q"], capture_output=True)
+    if r.returncode:
+        print(f"Warning: could not reset permissions on {path.name}. If the game will not start, run\n"
+              f'  icacls "{path}" /reset\n'
+              "from an administrator command prompt.", flush=True)
+
+
+class WorkDir:
+    """A scratch folder next to the game, created with the folder's normal permissions.
+
+    (tempfile.TemporaryDirectory on Python 3.13 locks its folder down to
+    SYSTEM/Administrators/owner, and files moved out of it keep that.)
+    """
+    def __init__(self, parent: Path):
+        for i in range(100):
+            self.path = parent / f"fxreborn-work-{os.getpid()}-{i}"
+            try:
+                self.path.mkdir()
+                return
+            except FileExistsError:
+                continue
+        raise Stop(f"Could not create a work folder in {parent}.")
+
+    def __enter__(self) -> Path:
+        return self.path
+
+    def __exit__(self, *exc):
+        shutil.rmtree(self.path, ignore_errors=True)
 
 
 # --------------------------------------------------------------- the patch
@@ -249,7 +287,9 @@ def install(exe: Path, rebuild: bool, scan: bool = False):
         learned = learned_sites(exe, state)
         new_learned = set(learned) - {int(x, 16) for x in state.get("learned_sites", [])}
         if state.get("patched_sha256") == current_sha and not rebuild and not new_learned:
-            print(f"Already installed for this game version ({state.get('site_kind')}). Nothing to do.")
+            reset_permissions(exe)  # repairs exes installed by 0.7.0 (see reset_permissions)
+            print(f"Already installed for this game version ({state.get('site_kind')}). "
+                  "Checked file permissions; nothing else to do.")
             return
         print("Rebuilding from the saved original" + (" with newly learned sites." if new_learned else "."))
     else:
@@ -272,8 +312,7 @@ def install(exe: Path, rebuild: bool, scan: bool = False):
     sites, kind, report = choose_sites(backup, original_sha, learned, scan)
     print(f"Game build: {original_sha[:16]}...  sites: {len(sites)}  list: {kind}", flush=True)
     started = time.time()
-    with tempfile.TemporaryDirectory(prefix="fxreborn-", dir=exe.parent) as tmpdir:
-        work = Path(tmpdir)
+    with WorkDir(exe.parent) as work:
         local = work / "original" / EXE_NAME
         local.parent.mkdir()
         shutil.copy2(backup, local)
@@ -288,6 +327,8 @@ def install(exe: Path, rebuild: bool, scan: bool = False):
         patched_sha = sha256(patched)
         shutil.copy2(runtime_src, exe.with_name(RUNTIME))
         os.replace(patched, exe)
+    reset_permissions(exe)
+    reset_permissions(exe.with_name(RUNTIME))
     log = exe.with_name(MISSED_LOG)
     if log.exists():
         log.replace(log.with_suffix(".log.processed"))
@@ -315,6 +356,7 @@ def restore(exe: Path):
     tmp = exe.with_suffix(".restore.tmp")
     shutil.copy2(backup, tmp)
     os.replace(tmp, exe)
+    reset_permissions(exe)
     for name in (RUNTIME, STATE_NAME):
         p = exe.with_name(name)
         if p.exists():
