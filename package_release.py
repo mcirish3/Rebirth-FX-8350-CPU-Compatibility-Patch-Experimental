@@ -2,7 +2,8 @@
 
 Players should not need to install anything. This copies a minimal Python 3.13
 runtime (the same layout as python.org's "embeddable" distribution: python.exe,
-python313.dll, a zipped standard library and a ._pth file) from the local
+python313.dll, the standard library as compiled files in python\Lib and a ._pth
+file; no zip inside the zip, which Nexus Mods quarantines) from the local
 Python install, adds the pinned libraries from src/pylibs, compiles
 fxcompat.dll with MSVC, and zips it all.
 
@@ -73,10 +74,9 @@ def build_python(out: Path):
     for f in (base / "DLLs").iterdir():
         if f.name.lower() in DLL_KEEP:
             shutil.copy2(f, py / f.name)
-    # Standard library as compiled bytecode in a zip, like the embeddable distribution.
-    stage = ROOT / "dist" / "stdlib"
-    if stage.exists():
-        shutil.rmtree(stage)
+    # Standard library as plain compiled .pyc files in python\Lib, not in a zip: Nexus Mods
+    # quarantines uploads that contain an archive inside the archive.
+    stage = py / "Lib"
     lib = base / "Lib"
     for path in lib.rglob("*.py"):
         rel = path.relative_to(lib)
@@ -85,14 +85,32 @@ def build_python(out: Path):
         dest = stage / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, dest)
-    # ddir: tracebacks show "python313.zip\threading.py", not the build PC's folder.
-    compileall.compile_dir(str(stage), quiet=1, legacy=True, optimize=0, ddir="python313.zip")
-    with zipfile.ZipFile(py / "python313.zip", "w", zipfile.ZIP_DEFLATED) as z:
-        for f in stage.rglob("*.pyc"):
-            z.write(f, f.relative_to(stage).as_posix())
-    shutil.rmtree(stage)
+    # legacy=True puts x.pyc beside x.py so it imports without the source;
+    # ddir: tracebacks show "Lib\threading.py", not the build PC's folder.
+    compileall.compile_dir(str(stage), quiet=1, legacy=True, optimize=0, ddir="Lib")
+    for path in stage.rglob("*.py"):
+        path.unlink()
     # ._pth: isolated, fixed search path (ignores any installed Python and PYTHONPATH).
-    (py / "python313._pth").write_text("python313.zip\n.\n..\\src\\pylibs\n..\\src\n..\n")
+    (py / "python313._pth").write_text("Lib\n.\n..\\src\\pylibs\n..\\src\n..\n")
+
+
+ARCHIVE_EXT = {".zip", ".7z", ".rar", ".whl", ".jar", ".cab", ".gz", ".tgz", ".bz2", ".xz", ".tar", ".egg"}
+ARCHIVE_MAGIC = (b"PK\x03\x04", b"7z\xbc\xaf\x27\x1c", b"Rar!", b"MSCF", b"\x1f\x8b")
+
+
+def check_no_nested_archives(folder: Path):
+    """Nexus Mods quarantines uploads that contain an archive inside the archive.
+    Stop before zipping if the package folder holds one (by extension or by file header)."""
+    bad = []
+    for f in sorted(folder.rglob("*")):
+        if not f.is_file():
+            continue
+        with f.open("rb") as fh:
+            head = fh.read(8)
+        if f.suffix.lower() in ARCHIVE_EXT or head.startswith(ARCHIVE_MAGIC):
+            bad.append(f.relative_to(folder).as_posix())
+    if bad:
+        sys.exit("Archive inside the package (Nexus Mods would quarantine it):\n  " + "\n  ".join(bad))
 
 
 def main():
@@ -113,6 +131,7 @@ def main():
         shutil.copytree(info, out / "src" / "pylibs" / info.name)
     build_dll(out)
     build_python(out)
+    check_no_nested_archives(out)
     sums = [f"{sha256(f)}  {f.relative_to(out).as_posix()}" for f in sorted(out.rglob("*")) if f.is_file()]
     (out / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n")
     archive = dist / f"{NAME}.zip"
