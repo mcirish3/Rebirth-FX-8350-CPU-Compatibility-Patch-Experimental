@@ -1,4 +1,4 @@
-FX Reborn 0.7.1 - FINAL FANTASY VII REBIRTH on CPUs without AVX2
+FX Reborn 0.7.2 - FINAL FANTASY VII REBIRTH on CPUs without AVX2
 ==================================================================
 
 Lets the Steam version of FF7 Rebirth run on CPUs that have AVX but not AVX2,
@@ -33,7 +33,7 @@ AFTER A GAME UPDATE
 IF THE GAME WON'T START AFTER INSTALLING 0.7.0
   0.7.0 could leave the patched exe readable only by administrators, so Steam
   failed to start it ("CreateProcess returned 5" / access denied). Run
-  "FX Reborn - Install or Update.cmd" from 0.7.1 once: it repairs the
+  "FX Reborn - Install or Update.cmd" from 0.7.1 or newer once: it repairs the
   permissions without rebuilding.
 
 UNINSTALL

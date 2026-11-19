@@ -45,7 +45,7 @@ BACKUP_SUFFIX = ".fxcompat-original"
 STATE_NAME = "fxreborn-state.json"
 MISSED_LOG = "fxreborn-missed.log"
 RUNTIME = "fxcompat.dll"
-VERSION = "FX Reborn 0.7.1 (build-on-PC)"
+VERSION = "FX Reborn 0.7.2 (build-on-PC)"
 
 
 class Stop(Exception):
