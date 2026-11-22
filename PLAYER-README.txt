@@ -36,6 +36,16 @@ IF THE GAME WON'T START AFTER INSTALLING 0.7.0
   "FX Reborn - Install or Update.cmd" from 0.7.1 or newer once: it repairs the
   permissions without rebuilding.
 
+IF THE GAME FREEZES ON A LOADING SCREEN OR AFTER A CUTSCENE (audio keeps playing)
+  This happens on 6-core FX CPUs such as the FX-6300. The game reads the CPU as
+  3 cores and starts too few worker threads, which then wait on each other
+  during level loads and quest updates. It isn't caused by the patch. Fix: in
+  Steam, right-click the game > Properties > Launch Options and enter
+      -usehyperthreading -USEALLAVAILABLECORES
+  If it still freezes, try adding -NumWorkerThreads=4. Found and tested by
+  domhan1234 (realdomdom on GitHub), who also noticed less audio stutter in
+  the pause menu with it. Other FX CPUs may benefit too.
+
 UNINSTALL
   Double-click "FX Reborn - Restore original.cmd", or use Steam > right-click
   the game > Properties > Installed Files > Verify integrity of game files.

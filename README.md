@@ -7,6 +7,12 @@ An experimental native CPU compatibility patch for **FINAL FANTASY VII REBIRTH, 
 - **Status:** experimental, gameplay-tested on one FX-8350 + RX 6600 PC. See *Testing and limitations* below.
 - **License:** MIT (see [LICENSE](LICENSE)). No rights to the game itself are granted.
 
+> **Freezes on a loading screen or right after a cutscene, with the audio still playing? (6-core FX CPUs such as the FX-6300)**
+> The game reads a 3-module FX CPU as 3 cores and starts too few worker threads. They deadlock during level loads and quest updates. It isn't caused by the patch.
+> **Fix:** Steam → right-click the game → Properties → Launch Options:
+> `-usehyperthreading -USEALLAVAILABLECORES`
+> If it still freezes, add `-NumWorkerThreads=4`. Found and tested by realdomdom ([#3](https://github.com/mcirish3/Rebirth-FX-8350-CPU-Compatibility-Patch-Experimental/issues/3)), who also saw less audio stutter in the pause menu. Other FX CPUs may benefit too.
+
 ---
 
 ## Game updates: build the patch on your own PC (`fxreborn.py`)
